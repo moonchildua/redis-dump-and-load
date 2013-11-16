@@ -26,6 +26,7 @@ def load(fp, host='localhost', port=6379, password=None, db=0):
     r = redis.Redis(host=host, port=port, password=password, db=db)
     pipe = r.pipeline()
     size = 0
+    key_count = 0
     for s in fp.xreadlines():
         table = json.loads(s)
         size = size + s.__len__()
@@ -34,27 +35,36 @@ def load(fp, host='localhost', port=6379, password=None, db=0):
             type = item['type']
             value = item['value']
             _writer(pipe, key, type, value)
+            key_count = key_count + 1
         if size > 1024*1024*5:
             pipe.execute()
             pipe = r.pipeline()
             size = 0
     pipe.execute()
+    print key_count, ' keys inserted'
 
 def _reader(r, keys, pretty):
-    for key in r.keys(keys):
+    kys = r.keys(keys)
+    print len(kys), ' keys found'
+    for key in kys:
         type = r.type(key)
         if type == 'string':
             value = r.get(key)
+            print 'String type : ', key
         elif type == 'list':
             value = r.lrange(key, 0, -1)
+            print 'List type : ', key
         elif type == 'set':
             value = list(r.smembers(key))
             if pretty:
                 value.sort()
+            print 'Set type : ', key
         elif type == 'zset':
             value = r.zrange(key, 0, -1, False, True)
+            print 'ZSet type : ', key
         elif type == 'hash':
             value = r.hgetall(key)
+            print 'Hash type : ', key
         else:
             raise UnknownTypeError('Unknown key type: %s' % type)
         yield key, type, value
@@ -118,14 +128,14 @@ def process(options):
 
 def get_usages():
     usage = "Usage: %prog [options]"
-    usage += "\n\nDump data from specified or default redis."
-    usage += "\n\nIf no output file is specified, dump to standard output."
+    usage += "\n\nDump specific keys from a redis to a file."
+    usage += "\n\nLoad data from a file to redis."
     return usage
 
 if __name__ == '__main__':
     parser = optparse.OptionParser(usage=get_usages())
-    parser.add_option('-m', '--host', help='connect to HOST (default localhost)')
-    parser.add_option('-p', '--port', help='connect to PORT (default 6379)')
+    parser.add_option('-m', '--host', help='connect to HOST')
+    parser.add_option('-p', '--port', help='connect to PORT')
     parser.add_option('-w', '--password', help='connect with PASSWORD')
     parser.add_option('-d', '--db', help='dump DATABASE (0-N, default 0)')
     parser.add_option('-l', '--load', help='Load from dump file')
