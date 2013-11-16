@@ -1,0 +1,141 @@
+import json
+import redis
+import sys
+import optparse
+import datetime
+
+def dump(fp, keys="*", host='localhost', port=6379, password=None, db=0, pretty=False):
+    r = redis.Redis(host=host, port=port, password=password, db=db)
+    kwargs = {}
+    if not pretty:
+        kwargs['separators'] = (',', ':')
+    else:
+        kwargs['indent'] = 2
+        kwargs['sor_keys'] = True
+
+    encoder = json.JSONEncoder(**kwargs)
+
+    for key, type, value in _reader(r, keys, pretty):
+        d = {}
+        d[key] = {'type':type, 'value':value}
+        item = encoder.encode(d)
+        fp.write(item)
+        fp.write("\n")
+
+def load(fp, host='localhost', port=6379, password=None, db=0):
+    r = redis.Redis(host=host, port=port, password=password, db=db)
+    pipe = r.pipeline()
+    size = 0
+    for s in fp.xreadlines():
+        table = json.loads(s)
+        size = size + s.__len__()
+        for key in table:
+            item = table[key]
+            type = item['type']
+            value = item['value']
+            _writer(pipe, key, type, value)
+        if size > 1024*1024*5:
+            pipe.execute()
+            pipe = r.pipeline()
+            size = 0
+    pipe.execute()
+
+def _reader(r, keys, pretty):
+    for key in r.keys(keys):
+        type = r.type(key)
+        if type == 'string':
+            value = r.get(key)
+        elif type == 'list':
+            value = r.lrange(key, 0, -1)
+        elif type == 'set':
+            value = list(r.smembers(key))
+            if pretty:
+                value.sort()
+        elif type == 'zset':
+            value = r.zrange(key, 0, -1, False, True)
+        elif type == 'hash':
+            value = r.hgetall(key)
+        else:
+            raise UnknownTypeError('Unknown key type: %s' % type)
+        yield key, type, value
+
+def _writer(pipe, key, type, value):
+    if type == 'string':
+        pipe.set(key, value)
+    elif type == 'list':
+        for element in value:
+            pipe.rpush(key, element)
+    elif type == 'set':
+        for element in value:
+            pipe.sadd(key, element)
+    elif type == 'zset':
+        for element in value.keys():
+            pipe.zadd(key, element, value[element])
+    elif type == 'hash':
+        for element in value.keys():
+            pipe.hset(key, element, value[element])
+    else:
+        raise UnknownTypeError("Unknown key type: %s" % type)
+
+
+def opions_to_kwargs(options):
+    args = {}
+    if options.host:
+        args['host'] = options.host
+    if options.port:
+        args['port'] = int(options.port)
+    if options.password: 
+        args['password'] = options.password
+    if options.db:
+        args['db'] = int(options.db)
+    if options.load:
+        args['load'] = options.load
+    if options.save:
+        args['save'] = options.save
+    if options.key:
+        args['key'] = options.key
+    return args
+
+def generate_filename():
+    return datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+
+def process(options):
+
+    args = opions_to_kwargs(options)
+
+    if options.save  and options.load:
+        print 'either load or save option should be enabled'
+    elif options.save:
+        output = open(args['save'], 'w')
+        dump(output, args['key'] if options.key else "*", 'localhost', 6379, None, 15)
+        output.close()
+    elif options.load:
+        input = open(args['load'], 'r')
+        load(input, 'localhost', 6379, None, 15)
+        input.close()
+    else:
+        print 'either load or save option should be enabled'
+
+def get_usages():
+    usage = "Usage: %prog [options]"
+    usage += "\n\nDump data from specified or default redis."
+    usage += "\n\nIf no output file is specified, dump to standard output."
+    return usage
+
+if __name__ == '__main__':
+    parser = optparse.OptionParser(usage=get_usages())
+    parser.add_option('-m', '--host', help='connect to HOST (default localhost)')
+    parser.add_option('-p', '--port', help='connect to PORT (default 6379)')
+    parser.add_option('-w', '--password', help='connect with PASSWORD')
+    parser.add_option('-d', '--db', help='dump DATABASE (0-N, default 0)')
+    parser.add_option('-l', '--load', help='Load from dump file')
+    parser.add_option('-s', '--save', help='Save to dump file')
+    parser.add_option('-k', '--key', help='Search Key')
+    
+    options, args = parser.parse_args()
+    
+    if len(args) > 0:
+        parser.print_help()
+        exit(4)
+
+    process(options)
