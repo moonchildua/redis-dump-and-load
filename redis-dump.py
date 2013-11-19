@@ -15,12 +15,17 @@ def dump(fp, keys="*", host='localhost', port=6379, password=None, db=0, pretty=
 
     encoder = json.JSONEncoder(**kwargs)
 
+    key_count = 0
+
     for key, type, value in _reader(r, keys, pretty):
         d = {}
         d[key] = {'type':type, 'value':value}
         item = encoder.encode(d)
         fp.write(item)
         fp.write("\n")
+        key_count = key_count + 1
+
+    print key_count, ' keys dumped into the file'
 
 def load(fp, host='localhost', port=6379, password=None, db=0):
     r = redis.Redis(host=host, port=port, password=password, db=db)
@@ -41,30 +46,30 @@ def load(fp, host='localhost', port=6379, password=None, db=0):
             pipe = r.pipeline()
             size = 0
     pipe.execute()
-    print key_count, ' keys inserted'
+    print key_count, ' keys inserted into redis'
 
 def _reader(r, keys, pretty):
     kys = r.keys(keys)
-    print len(kys), ' keys found'
+    #print len(kys), ' keys found'
     for key in kys:
         type = r.type(key)
         if type == 'string':
             value = r.get(key)
-            print 'String type : ', key
+            #print 'String type : ', key
         elif type == 'list':
             value = r.lrange(key, 0, -1)
-            print 'List type : ', key
+            #print 'List type : ', key
         elif type == 'set':
             value = list(r.smembers(key))
             if pretty:
                 value.sort()
-            print 'Set type : ', key
+            #print 'Set type : ', key
         elif type == 'zset':
             value = r.zrange(key, 0, -1, False, True)
-            print 'ZSet type : ', key
+            #print 'ZSet type : ', key
         elif type == 'hash':
             value = r.hgetall(key)
-            print 'Hash type : ', key
+            #print 'Hash type : ', key
         else:
             raise UnknownTypeError('Unknown key type: %s' % type)
         yield key, type, value
@@ -125,6 +130,9 @@ def process(options):
         input.close()
     else:
         print 'either load or save option should be enabled'
+        return False
+
+    return True
 
 def get_usages():
     usage = "Usage: %prog [options]"
@@ -134,18 +142,15 @@ def get_usages():
 
 if __name__ == '__main__':
     parser = optparse.OptionParser(usage=get_usages())
-    parser.add_option('-m', '--host', help='connect to HOST')
-    parser.add_option('-p', '--port', help='connect to PORT')
-    parser.add_option('-w', '--password', help='connect with PASSWORD')
+    parser.add_option('-m', '--host', default='localhost', help='connect to HOST(default is localhost)')
+    parser.add_option('-p', '--port', default=6379, help='connect to PORT(default is 6379)')
+    parser.add_option('-w', '--password', help='connect with PASSWORD(default is None')
     parser.add_option('-d', '--db', help='dump DATABASE (0-N, default 0)')
     parser.add_option('-l', '--load', help='Load from dump file')
     parser.add_option('-s', '--save', help='Save to dump file')
-    parser.add_option('-k', '--key', help='Search Key')
-    
-    options, args = parser.parse_args()
-    
-    if len(args) > 0:
-        parser.print_help()
-        exit(4)
+    parser.add_option('-k', '--key', help='Search Key(default is *)')
 
-    process(options)
+    options, args = parser.parse_args()
+
+    if not process(options):
+        parser.print_help()
