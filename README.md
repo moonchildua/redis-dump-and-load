@@ -1,6 +1,6 @@
 redis-dumpy help
 --------------------------------------------------
-
+<pre>
 (tut)redis-dump-and-load-$ python redis-dump.py -h
 Usage: redis-dump.py [options]
 
@@ -24,3 +24,4 @@ Options:
 
 (tut)redis-dump-and-load-$ python redis-dump.py -l data.js
 475  keys inserted into redis
+</pre>
