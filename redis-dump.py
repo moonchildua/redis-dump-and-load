@@ -122,11 +122,11 @@ def process(options):
         print 'either load or save option should be enabled'
     elif options.save:
         output = open(args['save'], 'w')
-        dump(output, args['key'] if options.key else "*", 'localhost', 6379, None, 15)
+        dump(output, args['key'] if options.key else "*", 'localhost', 6379, None, args['db'])
         output.close()
     elif options.load:
         input = open(args['load'], 'r')
-        load(input, 'localhost', 6379, None, 15)
+        load(input, 'localhost', 6379, None, args['db'])
         input.close()
     else:
         print 'either load or save option should be enabled'
