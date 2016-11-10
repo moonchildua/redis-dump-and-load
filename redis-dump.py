@@ -25,7 +25,7 @@ def dump(fp, keys="*", host='localhost', port=6379, password=None, db=0, pretty=
         fp.write("\n")
         key_count = key_count + 1
 
-    print key_count, ' keys dumped into the file'
+    print >> sys.stderr, key_count, ' keys dumped into the file'
 
 def load(fp, host='localhost', port=6379, password=None, db=0):
     r = redis.Redis(host=host, port=port, password=password, db=db)
@@ -46,30 +46,30 @@ def load(fp, host='localhost', port=6379, password=None, db=0):
             pipe = r.pipeline()
             size = 0
     pipe.execute()
-    print key_count, ' keys inserted into redis'
+    print >> sys.stderr, key_count, ' keys inserted into redis'
 
 def _reader(r, keys, pretty):
     kys = r.keys(keys)
-    #print len(kys), ' keys found'
+    #print >> sys.stderr, len(kys), ' keys found'
     for key in kys:
         type = r.type(key)
         if type == 'string':
             value = r.get(key)
-            #print 'String type : ', key
+            #print >> sys.stderr, 'String type : ', key
         elif type == 'list':
             value = r.lrange(key, 0, -1)
-            #print 'List type : ', key
+            #print >> sys.stderr, 'List type : ', key
         elif type == 'set':
             value = list(r.smembers(key))
             if pretty:
                 value.sort()
-            #print 'Set type : ', key
+            #print >> sys.stderr, 'Set type : ', key
         elif type == 'zset':
             value = r.zrange(key, 0, -1, False, True)
-            #print 'ZSet type : ', key
+            #print >> sys.stderr, 'ZSet type : ', key
         elif type == 'hash':
             value = r.hgetall(key)
-            #print 'Hash type : ', key
+            #print >> sys.stderr, 'Hash type : ', key
         else:
             raise UnknownTypeError('Unknown key type: %s' % type)
         yield key, type, value
@@ -119,17 +119,23 @@ def process(options):
     args = opions_to_kwargs(options)
 
     if options.save  and options.load:
-        print 'either load or save option should be enabled'
+        print >> sys.stderr, 'either load or save option should be enabled'
     elif options.save:
-        output = open(args['save'], 'w')
+        if (args['save'] == '-'):
+            output = sys.stdout
+        else:
+            output = open(args['save'], 'w')
         dump(output, args['key'] if options.key else "*", args['host'], args['port'], None, args['db'])
         output.close()
     elif options.load:
-        input = open(args['load'], 'r')
+        if (args['load'] == '-'):
+            input = sys.stdin
+        else:
+            input = open(args['load'], 'r')
         load(input, args['host'], args['port'], None, args['db'])
         input.close()
     else:
-        print 'either load or save option should be enabled'
+        print >> sys.stderr, 'either load or save option should be enabled'
         return False
 
     return True
@@ -146,8 +152,8 @@ if __name__ == '__main__':
     parser.add_option('-p', '--port', default=6379, help='connect to PORT(default is 6379)')
     parser.add_option('-w', '--password', help='connect with PASSWORD(default is None')
     parser.add_option('-d', '--db', help='dump DATABASE (0-N, default 0)')
-    parser.add_option('-l', '--load', help='Load from dump file')
-    parser.add_option('-s', '--save', help='Save to dump file')
+    parser.add_option('-l', '--load', help='Load from dump file or stdin if "-" passed in')
+    parser.add_option('-s', '--save', help='Save to dump file or stdout if "-" passed in')
     parser.add_option('-k', '--key', help='Search Key(default is *)')
 
     options, args = parser.parse_args()
