@@ -125,14 +125,14 @@ def process(options):
             output = sys.stdout
         else:
             output = open(args['save'], 'w')
-        dump(output, args['key'] if options.key else "*", args['host'], args['port'], None, args['db'])
+        dump(output, args['key'] if options.key else "*", args['host'], args['port'], args.get('password'), args['db'])
         output.close()
     elif options.load:
         if (args['load'] == '-'):
             input = sys.stdin
         else:
             input = open(args['load'], 'r')
-        load(input, args['host'], args['port'], None, args['db'])
+        load(input, args['host'], args['port'], args.get('password'), args['db'])
         input.close()
     else:
         print >> sys.stderr, 'either load or save option should be enabled'
