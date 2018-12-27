@@ -84,8 +84,8 @@ def _writer(pipe, key, type, value):
         for element in value:
             pipe.sadd(key, element)
     elif type == 'zset':
-        for element in value.keys():
-            pipe.zadd(key, element, value[element])
+        for element in value:
+            pipe.zadd(key, {element[0]: element[1]})
     elif type == 'hash':
         for element in value.keys():
             pipe.hset(key, element, value[element])
