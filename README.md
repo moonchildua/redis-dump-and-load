@@ -15,6 +15,7 @@ Options:
   -w PASSWORD, --password=PASSWORD
                         connect with PASSWORD(default is None
   -d DB, --db=DB        dump DATABASE (0-N, default 0)
+  -e SSL, --ssl=SSL     connect with SSL(default is False) 
   -l LOAD, --load=LOAD  Load from dump file
   -s SAVE, --save=SAVE  Save to dump file
   -k KEY, --key=KEY     Search Key(default is *)
@@ -25,3 +26,5 @@ Options:
 (tut)redis-dump-and-load-$ python redis-dump.py -l data.js
 475  keys inserted into redis
 </pre>
+
+origin of redis-dump-and-load without SSL you can find follow the link https://github.com/asit-dhal/redis-dump-and-load

@@ -4,8 +4,8 @@ import sys
 import optparse
 import datetime
 
-def dump(fp, keys="*", host='localhost', port=6379, password=None, db=0, pretty=False):
-    r = redis.Redis(host=host, port=port, password=password, db=db)
+def dump(fp, keys="*", host='localhost', port=6379, password=None, db=0, pretty=False, ssl=False):
+    r = redis.Redis(host=host, port=port, password=password, db=db, ssl=ssl)
     kwargs = {}
     if not pretty:
         kwargs['separators'] = (',', ':')
@@ -27,8 +27,8 @@ def dump(fp, keys="*", host='localhost', port=6379, password=None, db=0, pretty=
 
     print >> sys.stderr, key_count, ' keys dumped into the file'
 
-def load(fp, host='localhost', port=6379, password=None, db=0):
-    r = redis.Redis(host=host, port=port, password=password, db=db)
+def load(fp, host='localhost', port=6379, password=None, db=0, ssl=False):
+    r = redis.Redis(host=host, port=port, password=password, db=db, ssl=ssl)
     pipe = r.pipeline()
     size = 0
     key_count = 0
@@ -103,6 +103,8 @@ def opions_to_kwargs(options):
         args['password'] = options.password
     if options.db:
         args['db'] = int(options.db)
+    if options.ssl:
+        args['ssl'] = options.ssl
     if options.load:
         args['load'] = options.load
     if options.save:
@@ -125,14 +127,14 @@ def process(options):
             output = sys.stdout
         else:
             output = open(args['save'], 'w')
-        dump(output, args['key'] if options.key else "*", args['host'], args['port'], args.get('password'), args['db'])
+        dump(output, args['key'] if options.key else "*", args['host'], args['port'], args.get('password'), args['db'], args['ssl'])
         output.close()
     elif options.load:
         if (args['load'] == '-'):
             input = sys.stdin
         else:
             input = open(args['load'], 'r')
-        load(input, args['host'], args['port'], args.get('password'), args['db'])
+        load(input, args['host'], args['port'], args.get('password'), args['db'], args['ssl'])
         input.close()
     else:
         print >> sys.stderr, 'either load or save option should be enabled'
@@ -152,6 +154,7 @@ if __name__ == '__main__':
     parser.add_option('-p', '--port', default=6379, help='connect to PORT(default is 6379)')
     parser.add_option('-w', '--password', help='connect with PASSWORD(default is None')
     parser.add_option('-d', '--db', help='dump DATABASE (0-N, default 0)')
+    parser.add_option('-e', '--ssl', default=False, help='connect to redis with SSL(default is False)')
     parser.add_option('-l', '--load', help='Load from dump file or stdin if "-" passed in')
     parser.add_option('-s', '--save', help='Save to dump file or stdout if "-" passed in')
     parser.add_option('-k', '--key', help='Search Key(default is *)')
